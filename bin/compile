@@ -2,9 +2,19 @@
 # Usage: bin/compile <build-dir> <cache-dir> <env-dir>
 #
 
-error() {
-  echo " !     $*" >&2
-  exit 1
+set -o pipefail
+set -o errtrace
+set -o nounset
+
+trap 'err_handler $?' ERR
+
+err_handler() {
+  trap - ERR
+  let i=0 exit_status=$1
+  echo "Aborting on error $exit_status:"
+  echo "--------------------"
+  while caller $i; do ((i++)); done
+  exit $exit_status
 }
 
 topic() {
@@ -12,27 +22,43 @@ topic() {
 }
 
 indent() {
-  c='s/^/       /'
-  case $(uname) in
-    Darwin) sed -l "$c";;
-    *)      sed -u "$c";;
-  esac
+  sed -u "s/^/  /"
 }
 
 BUILD_DIR=$1
 CACHE_DIR=$2
-ENV_DIR=$3
 
-topic "Installing Nix"
-bash <(curl https://nixos.org/nix/install)
-. ~/.nix-profile/etc/profile.d/nix.sh
+if [ -d "$CACHE_DIR/nix" ]; then
+  topic "Restoring Nix from cache"
+  cp -r "$CACHE_DIR/nix" "$HOME/.nix"
+  ln -s $HOME/.nix/var/nix/profiles/default $HOME/.nix-profile
+else
+  topic "Installing Nix"
+  # FIXME: the version of nix is specified inline in the following script
+  $(dirname $0)/nix-heroku-install | indent
+
+  # Upgrade all the things
+  # nix-channel --update | indent
+  # nix-env -u '*' | indent 
+fi
+
+export PATH=$HOME/.nix-profile/bin:$PATH
+
 
 topic "Installing default.nix"
-nix-env -f $BUILD_DIR/default.nix -i '*'
+mkdir -p $BUILD_DIR/.nix
+export NIX_PROFILE=$BUILD_DIR/.nix/profile
+nix-env -f $BUILD_DIR/default.nix -i '*' | indent
 
-topic "Writing profile script"
+
+topic "Saving Nix to cache"
+nix-collect-garbage -d | indent
+rm -rf "$CACHE_DIR/nix"
+cp -a "$HOME/.nix" "$CACHE_DIR/nix"
+
+
+topic "Creating profile"
 mkdir -p $BUILD_DIR/.profile.d
 cat <<EOF > $BUILD_DIR/.profile.d/000_nix.sh
-. ~/.nix-profile/etc/profile.d/nix.sh
+export PATH=\$HOME/.nix-profile/bin:\$PATH
 EOF
-
