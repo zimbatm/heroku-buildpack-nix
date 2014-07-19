@@ -1,0 +1,6 @@
+#!/bin/sh
+# Usage: bin/release <build-dir>
+#
+# Returns default addons to add and processes to run.
+
+echo "--- {}"

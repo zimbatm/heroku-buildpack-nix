@@ -1,0 +1,38 @@
+#!/bin/bash
+# Usage: bin/compile <build-dir> <cache-dir> <env-dir>
+#
+
+error() {
+  echo " !     $*" >&2
+  exit 1
+}
+
+topic() {
+  echo "-----> $*"
+}
+
+indent() {
+  c='s/^/       /'
+  case $(uname) in
+    Darwin) sed -l "$c";;
+    *)      sed -u "$c";;
+  esac
+}
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+
+topic "Installing Nix"
+bash <(curl https://nixos.org/nix/install)
+. ~/.nix-profile/etc/profile.d/nix.sh
+
+topic "Installing default.nix"
+nix-env -f $BUILD_DIR/default.nix -i '*'
+
+topic "Writing profile script"
+mkdir -p $BUILD_DIR/.profile.d
+cat <<EOF > $BUILD_DIR/.profile.d/000_nix.sh
+. ~/.nix-profile/etc/profile.d/nix.sh
+EOF
+
