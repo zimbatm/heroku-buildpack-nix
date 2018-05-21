@@ -41,6 +41,11 @@ nix_options=(
   --store "$NIX_ROOT"
 )
 
+# For some reason the nix bundle depends on that
+topic "Installing hexdump"
+apt-get update -qq
+apt-get install -qy bsdmainutils
+
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
