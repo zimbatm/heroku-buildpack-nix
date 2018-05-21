@@ -30,12 +30,11 @@ CACHE_DIR=$2
 
 if [ -d "$CACHE_DIR/nix" ]; then
   topic "Restoring Nix from cache"
-  cp -r "$CACHE_DIR/nix" "$HOME/.nix"
-  ln -s $HOME/.nix/var/nix/profiles/default $HOME/.nix-profile
+  cp -r "$CACHE_DIR/nix" "$HOME/nix"
+  ln -s "$HOME/nix/var/nix/profiles/default" "$HOME/.nix-profile"
 else
   topic "Installing Nix"
-  # FIXME: the version of nix is specified inline in the following script
-  $(dirname $0)/nix-heroku-install | indent
+  "$(dirname "$0")/nix-heroku-install" | indent
 
   # Upgrade all the things
   # nix-channel --update | indent
@@ -46,15 +45,15 @@ export PATH=$HOME/.nix-profile/bin:$PATH
 
 
 topic "Installing default.nix"
-mkdir -p $BUILD_DIR/.nix
-export NIX_PROFILE=$BUILD_DIR/.nix/profile
-nix-env -f $BUILD_DIR/default.nix -i '*' | indent
+# mkdir -p $BUILD_DIR/.nix
+# export NIX_PROFILE=$BUILD_DIR/.nix/profile
+nix-env -f $BUILD_DIR/default.nix -i | indent
 
 
 topic "Saving Nix to cache"
 nix-collect-garbage -d | indent
 rm -rf "$CACHE_DIR/nix"
-cp -a "$HOME/.nix" "$CACHE_DIR/nix"
+cp -a "$HOME/nix" "$CACHE_DIR/nix"
 
 
 topic "Creating profile"

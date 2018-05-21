@@ -27,121 +27,55 @@ fetch() {
   curl -sSfL -o "$1" "$2"
 }
 
-if [ "$HOME" != /app ]; then
-  echo FAIL, not on Cedar: $HOME
-  exit 1
-fi
+# if [ "$HOME" != /app ]; then
+  # echo FAIL, not on Cedar: $HOME
+  # exit 1
+# fi
 
 BUILD_DIR=$HOME/nix-boot
-NIX_ROOT=$HOME/.nix
+NIX_ROOT=$HOME
+NIX_FILE=channel:nixos-18.03
 
-export PATH=$BUILD_DIR/bin:$PATH
-export PKG_CONFIG_PATH=$BUILD_DIR/lib/pkgconfig
-export LDFLAGS="-L$BUILD_DIR/lib"
-export CPPFLAGS="-I$BUILD_DIR/include"
-export PERL5OPT="-I$BUILD_DIR/lib/perl"
+nix_options=(
+  --substituters https://cache.nixos.org
+  --store "$NIX_ROOT"
+)
 
-rm -rf $BUILD_DIR
-mkdir -p $BUILD_DIR
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
 
-# Already installed on Cedar
-# cd $BUILD_DIR
-# wget -q http://www.bzip.org/1.0.6/bzip2-1.0.6.tar.gz
-# tar xzf bzip2-1.0.6.tar.gz
-# cd bzip2-1.0.6
-# make -f Makefile-libbz2_so
-# make install PREFIX=$BUILD_DIR
-# cp libbz2.so.1.0 libbz2.so.1.0.6 $BUILD_DIR/lib
-#
-# cd $BUILD_DIR
-# wget -q http://curl.haxx.se/download/curl-7.37.1.tar.bz2
-# tar xjf curl-7.37.1.tar.bz2
-# cd curl-7.37.1
-# ./configure --prefix=$BUILD_DIR
-# make
-# make install
-#
+topic "Bootstrapping nix"
+cd "$BUILD_DIR"
+fetch nix https://github.com/zimbatm/nix-bundle/releases/download/nix-bin/nix
+chmod +x nix
+./nix build "${nix_options[@]}" -f "$NIX_FILE" nix
+./result/bin/nix-env "${nix_options[@]}" -f "$NIX_FILE" -iA nix
 
-topic "Installing sqlite"
-cd $BUILD_DIR
-fetch sqlite.tar.gz http://www.sqlite.org/2014/sqlite-autoconf-3080500.tar.gz
-tar xzf sqlite.tar.gz
-cd sqlite-autoconf-3080500
-./configure --prefix=$BUILD_DIR
-make
-make install
-
-topic "Installing DBI"
-cd $BUILD_DIR
-fetch DBI.tar.gz http://search.cpan.org/CPAN/authors/id/T/TI/TIMB/DBI-1.631.tar.gz
-ls -la
-tar xzf DBI.tar.gz
-cd DBI-1.631
-perl Makefile.PL PREFIX=$BUILD_DIR
-make
-make install
-
-topic "Installing DBD-SQLite"
-cd $BUILD_DIR
-fetch DBD.tar.gz http://search.cpan.org/CPAN/authors/id/I/IS/ISHIGAKI/DBD-SQLite-1.42.tar.gz
-tar xzf DBD.tar.gz
-cd DBD-SQLite-1.42
-perl Makefile.PL PREFIX=$BUILD_DIR
-make
-make install
-
-topic "Installing WWW-Curl"
-cd $BUILD_DIR
-fetch WWW.tar.gz http://search.cpan.org/CPAN/authors/id/S/SZ/SZBALINT/WWW-Curl-4.17.tar.gz
-tar xzf WWW.tar.gz
-cd WWW-Curl-4.17
-perl Makefile.PL PREFIX=$BUILD_DIR
-make
-make install
-
-topic "Installing Nix"
-cd $BUILD_DIR
-fetch nix.tar.bz2 http://hydra.nixos.org/build/10272829/download/4/nix-1.7.tar.bz2
-tar xjf nix.tar.bz2
-cd nix-1.7
-# Trying to fix the missing --no-copy-dt-needed-entries option
-#grep -v copy-dt-needed-entries mk/lib.mk > mk/lib.mk.new
-#mv mk/lib.mk.new mk/lib.mk
-
-./configure --prefix=$BUILD_DIR --with-store-dir=$NIX_ROOT/store \
-  --localstatedir=$NIX_ROOT/var
-make
-make install
+# topic "Fetching nixpkgs"
+# nix-channel --add http://nixos.org/channels/nixpkgs-unstable
+# nix-channel --update
 
 
-topic "Fetching nixpkgs" 
-nix-channel --add http://nixos.org/channels/nixpkgs-unstable
-nix-channel --update
-
-
-#
-cat <<EOF > $HOME/.nixpkgs/config.nix
-pkgs:
-{
-  packageOverrides = self: {
-    nix = self.nix.override {
+# TODO: use a nix.conf file instead
+# cat <<EOF > $HOME/.nixpkgs/config.nix
+# pkgs:
+# {
+  # packageOverrides = self: {
+    # nix = self.nix.override {
       # Replace $HOME with your actual home directory; it will not
       # be expanded for you.
       # Also, the double quotes around the path are mandatory.
-      storeDir = "\$HOME/.nix/store";
-      stateDir = "\$HOME/.nix/var";
-    };
-  };
-}
-EOF
+      # storeDir = "\$HOME/.nix/store";
+      # stateDir = "\$HOME/.nix/var";
+    # };
+  # };
+# }
+# EOF
 
-topic "Installing nix with nix"
-nix-env -iA nix
-
-topic "Creating profile"
-ln -s $NIX_ROOT/var/nix/profiles/default $HOME/.nix-profile
+topic "Activating nix profile"
+ln -s "$NIX_ROOT/nix/var/nix/profiles/default" "$HOME/.nix-profile"
+# source "$HOME/.nix-profile/etc/profile.d/nix.sh"
 
 topic "Cleanup"
 # Alright we're bootstrapped, remove that old stuff
-rm -rf $BUILD_DIR
-
+rm -rf "$BUILD_DIR"
