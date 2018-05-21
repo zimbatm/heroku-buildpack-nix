@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+echo "Detecting"
+./bin/detect test/fixtures/simple-example
+
+echo "Building"
+CACHE_DIR=$(mktemp -d)
+echo "CACHE_DIR=$CACHE_DIR"
+./bin/compile test/fixtures/simple-example "$CACHE_DIR" "TODO"
+
